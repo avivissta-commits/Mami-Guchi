@@ -1,5 +1,53 @@
 "use strict";
 
+const viewportLock = {
+  width: 0,
+  height: 0,
+  orientation: "",
+};
+
+function viewportSize() {
+  const root = document.documentElement;
+  const visual = window.visualViewport;
+  const width = Math.round(
+    root.clientWidth || window.innerWidth || (visual && visual.width) || 390
+  );
+  const height = Math.round(
+    (visual && visual.height) || window.innerHeight || root.clientHeight || 844
+  );
+
+  return { width, height };
+}
+
+function stabilizeViewport() {
+  window.scrollTo(0, 0);
+  document.documentElement.scrollLeft = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollLeft = 0;
+  document.body.scrollTop = 0;
+}
+
+function lockAppViewport(force = false) {
+  const size = viewportSize();
+  const orientation = size.width > size.height ? "landscape" : "portrait";
+  const widthChanged = Math.abs(size.width - viewportLock.width) > 2;
+  const orientationChanged = orientation !== viewportLock.orientation;
+
+  if (!force && viewportLock.width && !widthChanged && !orientationChanged) {
+    stabilizeViewport();
+    return;
+  }
+
+  viewportLock.width = size.width;
+  viewportLock.height = size.height;
+  viewportLock.orientation = orientation;
+  document.documentElement.style.setProperty("--app-width", `${size.width}px`);
+  document.documentElement.style.setProperty("--app-height", `${size.height}px`);
+  stabilizeViewport();
+}
+
+lockAppViewport(true);
+
 const ASSETS = {
   idle: {
     breathing: "animations/idle/idle_breathing.mp4",
@@ -370,17 +418,25 @@ function render() {
   if (els.video.dataset.src !== state.visual.src) {
     els.video.dataset.src = state.visual.src;
     els.video.loop = true;
+    els.video.playsInline = true;
+    els.video.setAttribute("playsinline", "");
+    els.video.setAttribute("webkit-playsinline", "");
     els.video.src = state.visual.src;
     els.video.load();
-    const playRequest = els.video.play();
-
-    if (playRequest && typeof playRequest.catch === "function") {
-      playRequest.catch(() => undefined);
-    }
+    playCurrentVideo();
   }
 
   document.documentElement.dataset.visual = state.visual.kind;
   document.documentElement.dataset.selected = ACTIONS[state.selectedIndex].id;
+  stabilizeViewport();
+}
+
+function playCurrentVideo() {
+  const playRequest = els.video.play();
+
+  if (playRequest && typeof playRequest.catch === "function") {
+    playRequest.catch(() => undefined);
+  }
 }
 
 function confirmSelected() {
@@ -391,29 +447,86 @@ function cycleSelection() {
   dispatch({ type: "cycle", now: performance.now() });
 }
 
-els.icons.forEach((button, index) => {
-  button.addEventListener("click", (event) => {
-    event.currentTarget.blur();
+function bindStablePress(element, handler) {
+  let pressing = false;
 
-    if (index === state.selectedIndex) {
-      confirmSelected();
+  const finish = (event) => {
+    if (!pressing) {
       return;
     }
 
-    dispatch({ type: "select", index, now: performance.now() });
+    pressing = false;
+    event.preventDefault();
+    element.blur();
+    stabilizeViewport();
+    handler(event);
+    requestAnimationFrame(stabilizeViewport);
+  };
+
+  if (window.PointerEvent) {
+    element.addEventListener("pointerdown", (event) => {
+      pressing = true;
+      event.preventDefault();
+      element.setPointerCapture?.(event.pointerId);
+      stabilizeViewport();
+    });
+
+    element.addEventListener("pointerup", finish);
+    element.addEventListener("pointercancel", () => {
+      pressing = false;
+      stabilizeViewport();
+    });
+    return;
+  }
+
+  element.addEventListener(
+    "touchstart",
+    (event) => {
+      pressing = true;
+      event.preventDefault();
+      stabilizeViewport();
+    },
+    { passive: false }
+  );
+
+  element.addEventListener(
+    "touchend",
+    (event) => {
+      finish(event);
+    },
+    { passive: false }
+  );
+
+  element.addEventListener("click", (event) => {
+    event.preventDefault();
+    element.blur();
+    handler(event);
+    requestAnimationFrame(stabilizeViewport);
+  });
+}
+
+els.icons.forEach((button, index) => {
+  bindStablePress(button, () => {
+    if (index === state.selectedIndex) {
+      confirmSelected();
+    } else {
+      dispatch({ type: "select", index, now: performance.now() });
+    }
   });
 });
 
 els.controls.forEach((button) => {
-  button.addEventListener("click", (event) => {
-    event.currentTarget.blur();
-
+  bindStablePress(button, () => {
     if (button.dataset.control === "cycle") {
       cycleSelection();
     } else {
       confirmSelected();
     }
   });
+});
+
+els.video.addEventListener("canplay", () => {
+  playCurrentVideo();
 });
 
 window.addEventListener("keydown", (event) => {
@@ -435,6 +548,21 @@ document.addEventListener(
   },
   { passive: false }
 );
+
+window.addEventListener("resize", () => {
+  lockAppViewport(false);
+});
+
+window.addEventListener("orientationchange", () => {
+  setTimeout(() => lockAppViewport(true), 250);
+});
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    lockAppViewport(false);
+  });
+  window.visualViewport.addEventListener("scroll", stabilizeViewport);
+}
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {

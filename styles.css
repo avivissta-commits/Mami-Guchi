@@ -11,8 +11,10 @@
   --lcd: #8c9975;
   --lcd-dark: #23291f;
   --lcd-shadow: #020302;
+  --app-width: 100vw;
+  --app-height: 100vh;
   --icon-size: clamp(42px, 13.5vw, 58px);
-  --screen-size: min(78vw, 49svh, 348px);
+  --screen-size: min(calc(var(--app-width) * 0.78), calc(var(--app-height) * 0.49), 348px);
 }
 
 * {
@@ -24,7 +26,7 @@ html,
 body {
   width: 100%;
   min-width: 320px;
-  height: 100%;
+  height: var(--app-height);
   margin: 0;
   overflow: hidden;
   overflow-x: clip;
@@ -38,6 +40,8 @@ body {
 body {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: var(--app-height);
   display: block;
   font-family: system-ui, sans-serif;
   user-select: none;
@@ -64,13 +68,16 @@ button {
   isolation: isolate;
   overflow: hidden;
   overflow: clip;
-  width: min(100dvw, 430px);
-  height: 100dvh;
+  width: min(var(--app-width), 430px);
+  height: var(--app-height);
   max-width: 430px;
   margin: 0;
   transform: translateX(-50%);
   display: grid;
-  grid-template-rows: clamp(58px, 10svh, 82px) minmax(0, 1fr) clamp(138px, 25svh, 184px);
+  grid-template-rows:
+    clamp(58px, calc(var(--app-height) * 0.1), 82px)
+    minmax(0, 1fr)
+    clamp(138px, calc(var(--app-height) * 0.25), 184px);
   align-items: center;
   justify-items: center;
   padding:
@@ -237,6 +244,7 @@ button {
     inset 0 6px 12px rgba(255, 255, 255, 0.16);
   image-rendering: pixelated;
   transform: translateZ(0);
+  will-change: transform;
 }
 
 .display::before,
@@ -261,6 +269,8 @@ button {
 }
 
 .pet-video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
