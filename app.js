@@ -392,7 +392,9 @@ function cycleSelection() {
 }
 
 els.icons.forEach((button, index) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    event.currentTarget.blur();
+
     if (index === state.selectedIndex) {
       confirmSelected();
       return;
@@ -403,7 +405,9 @@ els.icons.forEach((button, index) => {
 });
 
 els.controls.forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    event.currentTarget.blur();
+
     if (button.dataset.control === "cycle") {
       cycleSelection();
     } else {
@@ -423,6 +427,14 @@ window.addEventListener("keydown", (event) => {
     confirmSelected();
   }
 });
+
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    event.preventDefault();
+  },
+  { passive: false }
+);
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
